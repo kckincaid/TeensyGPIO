@@ -7,3 +7,5 @@ A number of general purpose analog inputs are used; in this case, oil temperatur
 Provisions are made for 2x external thermocouple amplifiers (on Adafruit MAX 31856 boards) in order to read in two EGT signals.
 
 Additionally, outputs are created to control aftermarket gauges, in order to consolidate the number of sensors on the engine. Note that these outputs are low current (<20mA) and will require an external buffer to safely interface with gauges.
+
+This code relies on work by a number of others, including:
