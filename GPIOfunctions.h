@@ -22,8 +22,7 @@ float steinhartHart(int pin_, float R_, float c1_, float c2_, float c3_)
     float temp_ = (1.0 / (c1_ + c2_*logRT_ + c3_*logRT_*logRT_*logRT_));
 
     // Convert back to Farenheit
-    temp_ = temp_ - 273.15;
-    temp_ = (temp_ * 9.0)/ 5.0 + 32.0; 
+    temp_ = ((temp_ -273.15)*1.8) + 32.0; 
 
     return temp_;
 }
