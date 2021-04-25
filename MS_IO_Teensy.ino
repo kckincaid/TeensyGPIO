@@ -85,7 +85,7 @@ bool                        sendsuccess;
 
 // ------------------------------- EGTs ------------------------------ //
 uint16_t  EGTF, EGTR;
-float EGTFF, EGTRF, EGTFAvg, EGTRAvg, EGTFTOT, EGTRTOT;
+float EGTFTOT = 0, EGTRTOT = 0;
 // Software SPI pin order: CS, DI, DO, CLK
 Adafruit_MAX31856 EGTFBoard = Adafruit_MAX31856(5, 6, 7, 8);
 Adafruit_MAX31856 EGTRBoard = Adafruit_MAX31856(25, 26, 27, 28);
@@ -95,7 +95,7 @@ uint16_t  OILT;
 int       oiltemppin = 14; // A0
 float     oiltempres = 470; // resistor value for oil temp circuit
 float     OTC1 = 1.37e-3, OTC2 = 2.52e-4, OTC3 = 6.47e-9; // Steinhart-Hart model constants
-float     OILTF, OILTTOT, OILTAvg;
+float     OILTTOT = 0;
 
 // -------------------------- Oil Pressure --------------------------- //
 uint16_t  OILP;
@@ -108,7 +108,7 @@ float     FPV1 = 0.5;
 float     FPP1 = 0;
 float     FPV2 = 4.5;
 float     FPP2 = 15;
-float     FULPF, FULPTOT, FULPAvg;
+float     FULPTOT = 0;
 
 // -------------------------- Miscellaneous -------------------------- //
 int       Vo;
@@ -169,6 +169,12 @@ void loop()
         FULP = FULPTOT/j;
         EGTF = ((EGTFTOT/j)*1.8)+32;
         EGTR = ((EGTRTOT/j)*1.8)+32;
+
+        // Reset running totals
+        OILTTOT = 0;
+        FULPTOT = 0;
+        EGTFTOT = 0;
+        EGTRTOT = 0;
 
         // Reset dummy variable to restart averaging process
         j = 0;
@@ -266,7 +272,7 @@ void loop()
         lastLogTime = millis();
 
         // Update data log array with most recent data
-        float dataToLog[2] = {OILTF, FULPF};
+        float dataToLog[4] = {OILT, FULP, EGTF, EGTR};
   
         String dataString = "";
         int datasize = sizeof(dataToLog);
