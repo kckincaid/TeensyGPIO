@@ -223,16 +223,16 @@ void loop()
         {
             Serial.print("Oil temperature: ");
             Serial.println(OILT);
-            Serial.print("Oil pressure: ");
-            Serial.println(OILP);
-            Serial.print("Fuel pressure: ");
-            Serial.println(FULP);
-            Serial.print("Front exhaust gas temperature: ");
-            Serial.println(EGTF);
-            Serial.print("Rear exhaust gas temperature: ");
-            Serial.println(EGTR);
-            Serial.print("Autometer CLT gauge integer output (out of 256): ");
-            Serial.println(AMCLTTout);
+//            Serial.print("Oil pressure: ");
+//            Serial.println(OILP);
+//            Serial.print("Fuel pressure: ");
+//            Serial.println(FULP);
+//            Serial.print("Front exhaust gas temperature: ");
+//            Serial.println(EGTF);
+//            Serial.print("Rear exhaust gas temperature: ");
+//            Serial.println(EGTR);
+              Serial.print("Autometer CLT gauge integer output (out of 256): ");
+              Serial.println(AMCLTTout);
         }
     }
   
@@ -291,6 +291,15 @@ void loop()
           
           // read in data with getBCastData function, this is only of secondary importance.
           MCAN.getBCastData(rxmsg.id, rxmsg.buf, msbroad);
+
+          CLTT = msbroad.clt;
+
+          if (debug)
+          {
+              Serial.print("Coolant temperature from broadcast: ");
+              Serial.println(CLTT);
+          }
+
         } 
     }
 

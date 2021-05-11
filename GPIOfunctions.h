@@ -63,7 +63,7 @@ int gaugeCurrentControl(int pin_, float value_, float m_, float b_, float rshunt
     // Calculate necessary output voltage for desired constant current value
     float vout_ = ((value_*m_) + b_)*rshunt_;
 
-    int voutint_ = vout_*5/256;
+    int voutint_ = vout_/5*256;
 
     // Write pin output based on value and provided thresholds
     if ( vout_ < vmin_ )
