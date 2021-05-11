@@ -17,8 +17,8 @@
 
 // -------------------------- Micro USB Port ------------------------- //
 // GND      CAN GND   ||    Vin       Main power input
-// 00 (PWM) CAN Low?  ||    GND       Main ground
-// 01 (PWM) CAN High? ||    3.3V
+// 00 (PWM) CAN RX    ||    GND       Main ground
+// 01 (PWM) CAN TX    ||    3.3V
 // 02 (PWM)           ||    23 (A9)
 // 03 (PWM)           ||    22 (A8)
 // 04 (PWM) EGTF FLT  ||    21 (A7)
@@ -27,7 +27,7 @@
 // 07 (PWM) EGTF SDO  ||    18 (A4)
 // 08 (PWM) EGTF SCK  ||    17 (A3)
 // 09 (PWM)           ||    16 (A2)   Fuel pressure in (10kR pulldown)
-// 10 (PWM)           ||    15 (A1)   Oil pressure in
+// 10 (PWM)           ||    15 (A1)   Oil pressure in (10kR/10kR divider)
 // 11 (PWM)           ||    14 (A0)   Oil temperature in (470R pullup)
 // 12 (PWM)           ||    13 (LED)
 // 3.3V     CAN V+    ||    GND
@@ -35,8 +35,8 @@
 // 25 (A11) EGTL CS   ||    40 (A16)
 // 26 (A12) EGTL SDI  ||    39 (A15)
 // 27 (A13) EGTL SDO  ||    38 (A14)
-// 28 (PWM) EGTL SCK  ||    37 (PWM)
-// 29 (PWM)           ||    36 (PWM)
+// 28 (PWM) EGTL SCK  ||    37 (PWM)  Autometer coolant temp gauge output
+// 29 (PWM)           ||    36 (PWM)  Autometer oil temp gauge output
 // 30                 ||    35
 // 31                 ||    34
 // 32                 ||    33 (PWM)
@@ -46,10 +46,10 @@
 // -------------------------- Include Files -------------------------- //
 // ------------------------------------------------------------------- //
 
-#include <circular_buffer.h>
+//#include <circular_buffer.h>
 #include <FlexCAN_T4.h>
-#include <imxrt_flexcan.h>
-#include <kinetis_flexcan.h>
+//#include <imxrt_flexcan.h>
+//#include <kinetis_flexcan.h>
 #include <MegaCAN.h>
 #include <SD.h>
 #include <Adafruit_MAX31856.h>
@@ -79,7 +79,7 @@ int   canRefresh = 1000;  // Time elapsed before CAN timeout reached (ms)
 MegaCAN_message_t           msreq;    // Stores request for info from MS
 MegaCAN_message_t           msresp;   // Stores info to be sent to MS
 MegaCAN_broadcast_message_t msbroad;  // Stores info broadcast from MS
-static CAN_message_t        rxmsg;
+CAN_message_t               rxmsg;
 CAN_message_t               rspmsg;
 bool                        sendsuccess;
 
@@ -91,6 +91,10 @@ Adafruit_MAX31856 EGTFBoard = Adafruit_MAX31856(5, 6, 7, 8);
 Adafruit_MAX31856 EGTRBoard = Adafruit_MAX31856(25, 26, 27, 28);
 
 // ------------------------- Oil Temperature ------------------------- //
+// Read from center of 470R/sensor voltage divider, with sensor grounded
+// and top of divider powered by 5V. Steinhart-Hart model used to calculate
+// temperature based on readings taken from freezing and boiling water, 
+// and generic middle value from DIYAutoTune website.
 uint16_t  OILT;
 int       oiltemppin = 14; // A0
 float     oiltempres = 470; // resistor value for oil temp circuit
@@ -98,10 +102,18 @@ float     OTC1 = 1.37e-3, OTC2 = 2.52e-4, OTC3 = 6.47e-9; // Steinhart-Hart mode
 float     OILTTOT = 0;
 
 // -------------------------- Oil Pressure --------------------------- //
+// Read from center of 10k/10k voltage divider, with top connected to 
+// sensor wire. Voltage varies from approx. 6V at 0 psi, to 3.5V at 90 psi,
+// so a divider is required to bring voltage down to Teensy levels. Gauge
+// operates based on sensor current draw, so large resistors chosen to limit
+// effects on reading. See Gauge Driver google sheet for correlation.
 uint16_t  OILP;
 int       oilpresspin = 15; // A1
+float     OPM = -0.0314, OPB = 6.46, OPVD = 0.5, OPVmin = 1.0, OPVmax = 4.0;
+float     OILPTOT = 0;
 
 // -------------------------- Fuel Pressure -------------------------- //
+// 5V powered sensor with linear interpolation between min and max values.
 uint16_t  FULP;
 int       fuelpresspin = 16; // A2
 float     FPV1 = 0.5;
@@ -110,13 +122,30 @@ float     FPV2 = 4.5;
 float     FPP2 = 15;
 float     FULPTOT = 0;
 
+// ------------------- MS CAN Broadcast Variables -------------------- //
+// These values are recieved from MS via CAN broadcasting. Initialize to
+// bad values so it's obvious if they haven't been updated.
+const uint32_t baseID = 1520;
+int       CLTT = -777;
+
+// -------------------------- Gauge Drivers -------------------------- //
+// Use calculated values for coolant temp, oil temp, and oil pressure to
+// drive Autometer coolant and oil temp gauges, and OEM dash coolant and
+// oil pressure gauges. This reduces redundant sensors on engine.
+// Autometer coolant gauge values
+int       AMCLTTPIN = 37, AMCLTTout = 0;
+float     AMCLTVmin = 0.66, AMCLTVmax = 4.0, AMCLTVout = 0;
+float     AMCLTRshunt = 66, AMCLTm = 0.000349, AMCLTb = -0.0297;
+
+// Autometer oil temperature gauge values
+int       AMOILTPIN = 36;
+
+
 // -------------------------- Miscellaneous -------------------------- //
 int       Vo;
 int       j = 0;
 unsigned long canTime = millis();
 unsigned long lastLogTime = millis();
-
-
 
 // ------------------------------------------------------------------- //
 // ---------------------------- Setup Area --------------------------- //
@@ -125,6 +154,11 @@ void setup()
 {
     Serial.begin(9600);
     CANbus.begin();
+    CANbus.setBaudRate(500000);
+
+    // Need to tell FlexCAN to use extended frames
+    rspmsg.flags.extended = 1;
+    rspmsg.flags.remote = 0;
 
     Serial.print("Initializing SD card...");
   
@@ -154,6 +188,7 @@ void loop()
 {
     // Read in analog sensor inputs to running totals
     OILTTOT += steinhartHart(oiltemppin, oiltempres, OTC1, OTC2, OTC3);
+    OILPTOT += linearInterpolate(oilpresspin, OPM, OPB, OPVD);
     FULPTOT += linearInterpolate(fuelpresspin, FPV1, FPP1, FPV2, FPP2);
     EGTFTOT += EGTFBoard.readThermocoupleTemperature();
     EGTRTOT += EGTRBoard.readThermocoupleTemperature();
@@ -166,12 +201,14 @@ void loop()
     {
         // Compute average value over cycle
         OILT = OILTTOT/j;
+        OILP = OILPTOT/j;
         FULP = FULPTOT/j;
         EGTF = ((EGTFTOT/j)*1.8)+32;
         EGTR = ((EGTRTOT/j)*1.8)+32;
 
         // Reset running totals
         OILTTOT = 0;
+        OILPTOT = 0;
         FULPTOT = 0;
         EGTFTOT = 0;
         EGTRTOT = 0;
@@ -179,16 +216,23 @@ void loop()
         // Reset dummy variable to restart averaging process
         j = 0;
 
+        // Write output for gauge drivers
+        AMCLTTout = gaugeCurrentControl(AMCLTTPIN, CLTT, AMCLTm, AMCLTb, AMCLTRshunt, AMCLTVmin, AMCLTVmax);
+
         if(debug)
         {
             Serial.print("Oil temperature: ");
             Serial.println(OILT);
-            Serial.print("Fuel pressure: ");
-            Serial.println(FULP);
-            Serial.print("Front exhaust gas temperature: ");
-            Serial.println(EGTF);
-            Serial.print("Rear exhaust gas temperature: ");
-            Serial.println(EGTR);
+//            Serial.print("Oil pressure: ");
+//            Serial.println(OILP);
+//            Serial.print("Fuel pressure: ");
+//            Serial.println(FULP);
+//            Serial.print("Front exhaust gas temperature: ");
+//            Serial.println(EGTF);
+//            Serial.print("Rear exhaust gas temperature: ");
+//            Serial.println(EGTR);
+              Serial.print("Autometer CLT gauge integer output (out of 256): ");
+              Serial.println(AMCLTTout);
         }
     }
   
@@ -215,27 +259,16 @@ void loop()
           // Note: Fuel pressure will read 10x actual value, to preserve 1st decimal place
           MCAN.setMSresp(msreq, msresp, (uint16_t)EGTF, (uint16_t)EGTR, (uint16_t)OILT, (uint16_t)(FULP*10));
 
-          uint8_t varBlk    = msreq.data.request.varBlk;
-          uint8_t fromID    = msreq.core.fromID;
-          uint8_t toID      = msreq.core.toID;
-          uint32_t varOffset = msreq.data.request.varOffset;
-          uint8_t msgType   = 2;
-
-          msresp.responseCore = uint32_t(0);
-          msresp.responseCore |= (varBlk >> 4) << 2;            //isolate table bit 4, write to core bit 2
-          msresp.responseCore |= (varBlk & ~(0b00010000)) << 3; //isolate table bits 3-0, write to core bits 6-3
-          msresp.responseCore |= fromID << 7;                   //write ToID bits 3-0 to core bits 10-7
-          msresp.responseCore |= toID << 11;                    //write FromID bits 3-0 to core bits 14-11
-          msresp.responseCore |= msgType << 15;                 //write MsgType bits 2-0 to core bits 17-15
-          msresp.responseCore |= varOffset << 18;               //write Offset bits 10-0 to core bits 28-18
-
           // Transfer data from MegaCAN structure to FlexCAN structure
           rspmsg.id = msresp.responseCore;
-          rspmsg.len = msresp.data.request.varByt;
-          memcpy(msresp.data.response, rspmsg.buf, 8);
+          rspmsg.len = sizeof(msresp.data.response);
+          
+          for (int i = 0; i < rspmsg.len; i++)
+          {
+              rspmsg.buf[i] = msresp.data.response[i];
+          }
 
           // Send data back to MS
-          //CANbus.sendMsgBuf(msresp.responseCore, 1, msreq.data.request.varByt, msresp.data.response);
           sendsuccess = CANbus.write(rspmsg);
 
           if (debug)
@@ -248,10 +281,24 @@ void loop()
         // If it's not a data req, it's probably broadcast data (read in if desired)
         else
         {
+          if (debug)
+          {
+              Serial.println("CAN broadcast recieved from MS. Processing...");
+          }
+          
           // Record time that data broadcast was recieved
           canTime = millis();
           
           // read in data with getBCastData function, this is only of secondary importance.
+          MCAN.getBCastData(rxmsg.id, rxmsg.buf, msbroad);
+
+          CLTT = msbroad.clt;
+
+          if (debug)
+          {
+              Serial.print("Coolant temperature from broadcast: ");
+              Serial.println(CLTT);
+          }
         } 
     }
 
@@ -263,6 +310,7 @@ void loop()
             Serial.println("No CAN information recieved in specified refresh period.");
         }
         // Set variables to -777 if timeout occurs
+        CLTT = -777;
     }
 
     // Data log variables at the specified rate
@@ -272,7 +320,7 @@ void loop()
         lastLogTime = millis();
 
         // Update data log array with most recent data
-        float dataToLog[4] = {OILT, FULP, EGTF, EGTR};
+        float dataToLog[5] = {OILT, OILP, FULP, EGTF, EGTR};
   
         String dataString = "";
         int datasize = sizeof(dataToLog);

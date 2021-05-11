@@ -44,5 +44,43 @@ float linearInterpolate(int pin_, float x1_, float y1_, float x2_, float y2_)
     return y3_;
 }
 
+// Linear interpolation function type 2 - for resistive sensors with voltage divider on input pin
+// Required inputs: pin to read voltage from, voltage to reading slope, voltage to reading intercept, voltage divider factor
+// Voltage on x-axis, sensor reading on y-axis
+float linearInterpolate(int pin_, float m_, float b_, float vd_)
+{
+    // Read voltage of specified pin
+    int Vo_ = analogRead(pin_);
+
+    // Calculate reading from pin voltage, slope, intercept, and voltage divider value
+    float y3_ = m_*(Vo_/vd_) + b_;
+
+    return y3_;
+}
+
+int gaugeCurrentControl(int pin_, float value_, float m_, float b_, float rshunt_, float vmin_, float vmax_)
+{
+    // Calculate necessary output voltage for desired constant current value
+    float vout_ = ((value_*m_) + b_)*rshunt_;
+
+    int voutint_ = vout_/5*256;
+
+    // Write pin output based on value and provided thresholds
+    if ( vout_ < vmin_ )
+    {
+        analogWrite(pin_, (int)(vmin_/5*256));
+    }
+    else if ( vout_ > vmax_ )
+    {
+        analogWrite(pin_, (int)(vmax_/5*256));
+    }
+    else
+    {
+        analogWrite(pin_, (int)(voutint_));
+    }
+
+    return voutint_;
+}
+
 // Keep this line at end of code
 #endif
