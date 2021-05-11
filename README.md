@@ -14,7 +14,6 @@ This code relies on work by a number of others, including:
 - The MegaCAN library by Mikey Antonakakis on the MSExtra forums
 - The Teensy / MS dash interface developed by ToplessFC3Sman on RX7Club
 - The FlexCAN_T4 library fork created by PJRC forum member tonton81
-- The 
-- Adafruit MAX31586 thermocouple amplifier library
+- The Adafruit MAX31586 thermocouple amplifier library
 
 Many thanks for their hard work, and the work of all others who played a part but weren't mentioned above.
