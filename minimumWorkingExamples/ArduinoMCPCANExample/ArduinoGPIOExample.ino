@@ -72,6 +72,7 @@ void loop()
           Serial.print("Offset of request is: ");
           Serial.println(msreq.core.toOffset);
 
+          // Make oil temperature time-dependent so you can track it in Tuner Studio to see if it updates correctly.
           oilt = 100*(sin(millis()/1000)+1);
 
           // Create response to data request. Data must be sent as integers, to type cast to uint16_t prior to sending.
@@ -128,7 +129,9 @@ void loop()
           // read in data with getBCastData function
           Serial.println("Broadcast data recieved from MS. Processing...");
 
-          //MCAN.getBCastData(canID, buf, msbroad);
+          // This line creates a LOT of variables which can cause issues with stability on basic boards like the Uno.
+          // Can comment out unnecessary stuff in the MegaCAN.cpp file to save memory space.
+          MCAN.getBCastData(canID, buf, msbroad);
 
           // Broadcast data can be accessed directly from the broadcast message where it was stored, as long
           // as that specific data broadcast is enabled in TunerStudio.
