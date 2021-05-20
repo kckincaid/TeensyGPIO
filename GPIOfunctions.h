@@ -63,16 +63,22 @@ int gaugeCurrentControl(int pin_, float value_, float m_, float b_, float rshunt
     // Calculate necessary output voltage for desired constant current value
     float vout_ = ((value_*m_) + b_)*rshunt_;
 
-    int voutint_ = vout_/5*256;
+    Serial.print("Calculated output voltage is: ");
+    Serial.println(vout_);
+
+    int voutint_ = vout_/3.3*256;
+
+    Serial.print("Converted to integer (out of 256): ");
+    Serial.println(voutint_);
 
     // Write pin output based on value and provided thresholds
     if ( vout_ < vmin_ )
     {
-        analogWrite(pin_, (int)(vmin_/5*256));
+        analogWrite(pin_, (int)(vmin_/3.3*256));
     }
     else if ( vout_ > vmax_ )
     {
-        analogWrite(pin_, (int)(vmax_/5*256));
+        analogWrite(pin_, (int)(vmax_/3.3*256));
     }
     else
     {

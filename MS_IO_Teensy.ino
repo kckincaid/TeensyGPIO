@@ -91,13 +91,13 @@ Adafruit_MAX31856 EGTFBoard = Adafruit_MAX31856(5, 6, 7, 8);
 Adafruit_MAX31856 EGTRBoard = Adafruit_MAX31856(25, 26, 27, 28);
 
 // ------------------------- Oil Temperature ------------------------- //
-// Read from center of 470R/sensor voltage divider, with sensor grounded
-// and top of divider powered by 5V. Steinhart-Hart model used to calculate
+// Read from center of 500R/sensor voltage divider, with sensor grounded
+// and top of divider powered by 3.3V. Steinhart-Hart model used to calculate
 // temperature based on readings taken from freezing and boiling water, 
 // and generic middle value from DIYAutoTune website.
 uint16_t  OILT;
 int       oiltemppin = 14; // A0
-float     oiltempres = 470; // resistor value for oil temp circuit
+float     oiltempres = 500; // resistor value for oil temp circuit
 float     OTC1 = 1.37e-3, OTC2 = 2.52e-4, OTC3 = 6.47e-9; // Steinhart-Hart model constants
 float     OILTTOT = 0;
 
@@ -134,12 +134,11 @@ int       CLTT = -777;
 // oil pressure gauges. This reduces redundant sensors on engine.
 // Autometer coolant gauge values
 int       AMCLTTPIN = 37, AMCLTTout = 0;
-float     AMCLTVmin = 0.66, AMCLTVmax = 4.0, AMCLTVout = 0;
-float     AMCLTRshunt = 66, AMCLTm = 0.000349, AMCLTb = -0.0297;
+float     AMCLTVmin = 0.0, AMCLTVmax = 3.3, AMCLTVout = 0;
+float     AMCLTRshunt = 50, AMCLTm = 0.000405, AMCLTb = -0.04;
 
 // Autometer oil temperature gauge values
 int       AMOILTPIN = 36;
-
 
 // -------------------------- Miscellaneous -------------------------- //
 int       Vo;
@@ -179,6 +178,10 @@ void setup()
     // Set thermocouple types
     EGTFBoard.setThermocoupleType(MAX31856_TCTYPE_K);
     EGTRBoard.setThermocoupleType(MAX31856_TCTYPE_K);
+
+    // Set output pins for gauge controllers
+    pinMode(AMCLTTPIN, OUTPUT);
+    pinMode(AMOILTPIN, OUTPUT);
 }
 
 // ------------------------------------------------------------------- //
@@ -299,7 +302,6 @@ void loop()
               Serial.print("Coolant temperature from broadcast: ");
               Serial.println(CLTT);
           }
-
         } 
     }
 
