@@ -88,5 +88,62 @@ int gaugeCurrentControl(int pin_, float value_, float m_, float b_, float rshunt
     return voutint_;
 }
 
+void warningLight(int pin_, float value_, float lowSet_, float highSet_, float freq_, bool reverse_)
+{
+    // Declare on and off times
+    int onTime_ = 0, offTime_ = 0, status_ = 0;
+    
+    // Fast blink if the extreme setpoint is exceeded
+    if ((value_ > highSet_ && !reverse_) || (value_ < lowSet_ && reverse_))
+    {
+        // If "off" interval is done, turn on for specified interval
+        if (millis() > onTime_ && status_ == 0)
+        {
+            offTime_ = millis() + freq_/3;
+
+            digitalWrite(pin_, HIGH);
+
+            status_ = 1;
+        }
+        // If "on" interval is done, turn off for specified interval
+        if (millis() > offTime_  && status_ == 1)
+        {
+            onTime_ = millis() + freq_/3;
+          
+            digitalWrite(pin_, LOW);
+
+            status_ = 0;
+        }
+    }
+    // Slow blink if warning value is exceeded
+    if ((value_ > lowSet_ && !reverse_) || (value_ < highSet_ && reverse_))
+    {
+        // If "off" interval is done, turn on for specified interval
+        if (millis() > onTime_ && status_ == 0)
+        {
+            offTime_ = millis() + freq_;
+
+            digitalWrite(pin_, HIGH);
+
+            status_ = 1;
+        }
+        // If "on" interval is done, turn off for specified interval
+        if (millis() > offTime_  && status_ == 1)
+        {
+            onTime_ = millis() + freq_;
+          
+            digitalWrite(pin_, LOW);
+
+            status_ = 0;
+        }
+    }
+    else
+    {
+        digitalWrite(pin_, LOW);
+
+        status_ = 0;
+    }
+}
+
 // Keep this line at end of code
 #endif

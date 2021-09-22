@@ -19,27 +19,27 @@
 // GND      CAN GND   ||    Vin       Main power input
 // 00 (PWM) CAN RX    ||    GND       Main ground
 // 01 (PWM) CAN TX    ||    3.3V
-// 02 (PWM)           ||    23 (A9)
+// 02 (PWM) PWM1      ||    23 (A9)
 // 03 (PWM)           ||    22 (A8)
-// 04 (PWM) EGTF FLT  ||    21 (A7)
-// 05 (PWM) EGTF CS   ||    20 (A6)
-// 06 (PWM) EGTF SDI  ||    19 (A5)
-// 07 (PWM) EGTF SDO  ||    18 (A4)
-// 08 (PWM) EGTF SCK  ||    17 (A3)
-// 09 (PWM)           ||    16 (A2)   Fuel pressure in (10kR pulldown)
-// 10 (PWM)           ||    15 (A1)   Oil pressure in (10kR/10kR divider)
-// 11 (PWM)           ||    14 (A0)   Oil temperature in (470R pullup)
-// 12 (PWM)           ||    13 (LED)
-// 3.3V     CAN V+    ||    GND
-// 24 (A10) EGTL FLT  ||    41 (A17)
-// 25 (A11) EGTL CS   ||    40 (A16)
-// 26 (A12) EGTL SDI  ||    39 (A15)
-// 27 (A13) EGTL SDO  ||    38 (A14)
-// 28 (PWM) EGTL SCK  ||    37 (PWM)  Autometer coolant temp gauge output
-// 29 (PWM)           ||    36 (PWM)  Autometer oil temp gauge output
-// 30                 ||    35
-// 31                 ||    34
-// 32                 ||    33 (PWM)
+// 04 (PWM)           ||    21 (A7)   AI8
+// 05 (PWM)           ||    20 (A6)   AI7
+// 06 (PWM)           ||    19 (A5)   AI6 - Fuel pressure in (5V powered - 10kR/10kR divider)
+// 07 (PWM)           ||    18 (A4)   AI5 - Oil pressure in (12V powered - 30kR/10kR divider)
+// 08 (PWM)           ||    17 (A3)   AI4
+// 09 (PWM)           ||    16 (A2)   AI3
+// 10 (PWM)           ||    15 (A1)   AI2
+// 11 (PWM)           ||    14 (A0)   AI1 - Oil temperature in (passive - 470R pullup)
+// 12 (PWM)           ||    13 (LED)  G1 - OEM water temp
+// 3.3V               ||    GND
+// 24 (A10)           ||    41 (A17)  SPR4
+// 25 (A11) EGT1 CS   ||    40 (A16)  SPR3 - Oil pressure warning
+// 26 (A12) EGT1 SDI  ||    39 (A15)  SPR2 - Oil temp warning
+// 27 (A13) EGT1 SDO  ||    38 (A14)  SPR1 - Coolant temp warning
+// 28 (PWM) EGT1 SCK  ||    37 (PWM)  G4
+// 29 (PWM) EGT2 CS   ||    36 (PWM)  G3 - Autometer oil temperature
+// 30       EGT2 SDI  ||    35
+// 31       EGT2 SDO  ||    34
+// 32       EGT2 SCK  ||    33 (PWM) G2 - OEM oil pressure
 // -------------------------- Micro SD Slot -------------------------- //
 
 // ------------------------------------------------------------------- //
@@ -87,8 +87,8 @@ bool                        sendsuccess;
 uint16_t  EGTF, EGTR;
 float EGTFTOT = 0, EGTRTOT = 0;
 // Software SPI pin order: CS, DI, DO, CLK
-Adafruit_MAX31856 EGTFBoard = Adafruit_MAX31856(5, 6, 7, 8);
-Adafruit_MAX31856 EGTRBoard = Adafruit_MAX31856(25, 26, 27, 28);
+Adafruit_MAX31856 EGTFBoard = Adafruit_MAX31856(25, 26, 27, 28);
+Adafruit_MAX31856 EGTRBoard = Adafruit_MAX31856(29, 30, 31, 32);
 
 // ------------------------- Oil Temperature ------------------------- //
 // Read from center of 500R/sensor voltage divider, with sensor grounded
@@ -96,8 +96,8 @@ Adafruit_MAX31856 EGTRBoard = Adafruit_MAX31856(25, 26, 27, 28);
 // temperature based on readings taken from freezing and boiling water, 
 // and generic middle value from DIYAutoTune website.
 uint16_t  OILT;
-int       oiltemppin = 14; // A0
-float     oiltempres = 500; // resistor value for oil temp circuit
+int       oiltemppin = 14; // AI1
+float     oiltempres = 470; // resistor value for oil temp circuit
 float     OTC1 = 1.37e-3, OTC2 = 2.52e-4, OTC3 = 6.47e-9; // Steinhart-Hart model constants
 float     OILTTOT = 0;
 
@@ -108,14 +108,14 @@ float     OILTTOT = 0;
 // operates based on sensor current draw, so large resistors chosen to limit
 // effects on reading. See Gauge Driver google sheet for correlation.
 uint16_t  OILP;
-int       oilpresspin = 15; // A1
-float     OPM = -0.0314, OPB = 6.46, OPVD = 0.5, OPVmin = 1.0, OPVmax = 4.0;
+int       oilpresspin = 18; // AI5
+float     OPM = -0.0314, OPB = 6.46, OPVD = 0.25, OPVmin = 1.0, OPVmax = 4.0;
 float     OILPTOT = 0;
 
 // -------------------------- Fuel Pressure -------------------------- //
 // 5V powered sensor with linear interpolation between min and max values.
 uint16_t  FULP;
-int       fuelpresspin = 16; // A2
+int       fuelpresspin = 19; // AI6
 float     FPV1 = 0.5;
 float     FPP1 = 0;
 float     FPV2 = 4.5;
@@ -139,6 +139,21 @@ float     AMCLTRshunt = 50, AMCLTm = 0.000405, AMCLTb = -0.04;
 
 // Autometer oil temperature gauge values
 int       AMOILTPIN = 36;
+
+// -------------------------- Warning Lights ------------------------- //
+// Use SPR outputs to activative warnings lights. Define warning pin and
+// two setpoints, for slow and fast blink/beep
+// Blink frequency (ms)
+int       blinkFreq = 1000;
+// Water temp
+int       cltWarnPin = 38;
+float     cltWarn1 = 210, cltWarn2 = 220;
+// Oil temp
+int       oiltWarnPin = 39;
+float     oiltWarn1 = 210, oiltWarn2 = 220;
+// Oil pressure
+int       oilpWarnPin = 40;
+float     oilpWarn1 = 20, oilpWarn2 = 10;
 
 // -------------------------- Miscellaneous -------------------------- //
 int       Vo;
@@ -316,6 +331,11 @@ void loop()
         CLTT = -777;
     }
 
+    // Set warning light outputs
+    warningLight(cltWarnPin, CLTT, cltWarn1, cltWarn2, blinkFreq, false);
+    warningLight(oiltWarnPin, OILT, oiltWarn1, oiltWarn2, blinkFreq, false);
+    warningLight(oilpWarnPin, OILP, oilpWarn2, oilpWarn1, blinkFreq, true);
+
     // Data log variables at the specified rate
     if (datalog && millis() > lastLogTime + logPeriod)
     {         
@@ -323,7 +343,7 @@ void loop()
         lastLogTime = millis();
 
         // Update data log array with most recent data
-        float dataToLog[5] = {OILT, OILP, FULP, EGTF, EGTR};
+        float dataToLog[6] = {CLTT, OILT, OILP, FULP, EGTF, EGTR};
   
         String dataString = "";
         int datasize = sizeof(dataToLog);
